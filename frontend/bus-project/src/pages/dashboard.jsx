@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { busesAPI } from '../services/api';
 import './dashboard.css';
 
 const Dashboard = () => {
@@ -11,19 +12,36 @@ const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredBuses, setFilteredBuses] = useState([]);
 
-  // Mock bus data
-  const mockBuses = [
-    { id: 1, name: "Brighter Days", destination: "Nairobi", price: 500, departure: "08:00 AM", seats: 45, type: "Standard", from: "Nairobi", to: "Mombasa", date: "2024-01-15" },
-    { id: 2, name: "Blicky", destination: "Mombasa", price: 1200, departure: "10:30 AM", seats: 32, type: "Luxury", from: "Nairobi", to: "Mombasa", date: "2024-01-15" },
-    { id: 3, name: "Zootopia", destination: "Nakuru", price: 400, departure: "07:15 AM", seats: 52, type: "Standard", from: "Nairobi", to: "Nakuru", date: "2024-01-15" },
-    { id: 4, name: "Kasongo Must go  ", destination: "Mombasa", price: 1100, departure: "09:45 AM", seats: 40, type: "Semi-Luxury", from: "Nairobi", to: "Mombasa", date: "2024-01-15" },
-    { id: 5, name: "Nilambishe Glossi", destination: "Eldoret", price: 700, departure: "11:00 AM", seats: 38, type: "Standard", from: "Nairobi", to: "Eldoret", date: "2024-01-15" },
-    { id: 6, name: "BatMobile", destination: "Kisumu", price: 850, departure: "06:30 AM", seats: 44, type: "Semi-Luxury", from: "Nairobi", to: "Kisumu", date: "2024-01-15" }
-  ];
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    setBuses(mockBuses);
-    setFilteredBuses(mockBuses);
+    const fetchBuses = async () => {
+      setLoading(true);
+      const result = await busesAPI.getBuses();
+      if (result.success) {
+        // Map backend fields to frontend UI fields
+        const mappedBuses = result.data.map(bus => ({
+          id: bus._id?.$oid || bus._id || bus.id,
+          name: bus.bus_number,
+          destination: bus.route.to,
+          from: bus.route.from,
+          to: bus.route.to,
+          price: bus.route.price,
+          departure: bus.route.departure_time,
+          seats: bus.total_seats,
+          type: bus.bus_type,
+          date: new Date().toISOString().split('T')[0] // Default to today
+        }));
+        setBuses(mappedBuses);
+        setFilteredBuses(mappedBuses);
+      } else {
+        setError(result.error);
+      }
+      setLoading(false);
+    };
+
+    fetchBuses();
   }, []);
 
   useEffect(() => {
@@ -140,8 +158,8 @@ const Dashboard = () => {
                   <span className="value">{bus.departure}</span>
                 </div>
                 <div className="detail-item">
-                  <span className="label">Seats:</span>
-                  <span className="value">{bus.seats} available</span>
+                  <span className="label">Total Seats:</span>
+                  <span className="value">{bus.seats}</span>
                 </div>
                 <div className="detail-item price">
                   <span className="label">Price:</span>
@@ -157,7 +175,18 @@ const Dashboard = () => {
             </div>
           ))}
         </div>
-        {filteredBuses.length === 0 && (
+        {loading && (
+          <div className="loading-state">
+            <p>Loading available buses...</p>
+          </div>
+        )}
+        {error && (
+          <div className="error-state" style={{ color: 'red', padding: '20px', textAlign: 'center' }}>
+            <p>{error}</p>
+            <button onClick={() => window.location.reload()} className="retry-btn">Retry</button>
+          </div>
+        )}
+        {!loading && !error && filteredBuses.length === 0 && (
           <div className="no-buses">
             <p>No buses found matching your search.</p>
           </div>

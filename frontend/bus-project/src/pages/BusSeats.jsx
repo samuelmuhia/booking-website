@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { busesAPI } from '../services/api';
 import './BusSeats.css';
 
 const BusSeats = () => {
@@ -22,22 +23,33 @@ const BusSeats = () => {
     seats: 40
   };
 
+  const [seats, setSeats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
 
-  // Generate seats data
-  const generateSeats = () => {
-    const seats = [];
-    for (let i = 1; i <= bus.seats; i++) {
-      seats.push({
-        number: i,
-        available: Math.random() > 0.3,
-        type: i <= 20 ? 'standard' : 'premium'
-      });
-    }
-    return seats;
-  };
+  useEffect(() => {
+    const fetchSeats = async () => {
+      if (!bus.id) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      const result = await busesAPI.getBusSeats(bus.id, bus.date);
+      if (result.success) {
+        setSeats(result.data.seats.map(s => ({
+          number: s.seat_number,
+          available: s.is_available,
+          type: parseInt(s.seat_number) <= 20 ? 'premium' : 'standard'
+        })));
+      } else {
+        setError(result.error);
+      }
+      setLoading(false);
+    };
 
-  const seats = generateSeats();
+    fetchSeats();
+  }, [bus.id, bus.date]);
 
   const toggleSeatSelection = (seatNumber) => {
     const seat = seats.find(s => s.number === seatNumber);
@@ -94,17 +106,23 @@ const BusSeats = () => {
         <div className="bus-layout">
           <div className="driver-section">Driver</div>
           <div className="seats-grid">
-            {seats.map(seat => (
-              <div
-                key={seat.number}
-                className={`seat ${!seat.available ? 'occupied' : ''} ${
-                  selectedSeats.includes(seat.number) ? 'selected' : ''
-                } ${seat.type}`}
-                onClick={() => seat.available && toggleSeatSelection(seat.number)}
-              >
-                {seat.number}
-              </div>
-            ))}
+            {loading ? (
+              <p>Loading seats...</p>
+            ) : error ? (
+              <p style={{ color: 'red' }}>{error}</p>
+            ) : (
+              seats.map(seat => (
+                <div
+                  key={seat.number}
+                  className={`seat ${!seat.available ? 'occupied' : ''} ${
+                    selectedSeats.includes(seat.number) ? 'selected' : ''
+                  } ${seat.type}`}
+                  onClick={() => seat.available && toggleSeatSelection(seat.number)}
+                >
+                  {seat.number}
+                </div>
+              ))
+            )}
           </div>
         </div>
 

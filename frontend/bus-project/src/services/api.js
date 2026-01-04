@@ -37,7 +37,19 @@ api.interceptors.response.use(
     
     let userMessage = 'An unexpected error occurred';
     
-    if (error.response?.status === 404) {
+    if (error.response?.status === 401) {
+      // If it's a login attempt, use the server's error message if available
+      if (error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register')) {
+        userMessage = error.response.data?.error || 'Invalid credentials. Please try again.';
+      } else {
+        userMessage = 'Your session has expired or is invalid. Please login again.';
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }
+    } else if (error.response?.status === 404) {
       userMessage = 'API endpoint not found. Check if backend is running.';
     } else if (error.code === 'ECONNREFUSED') {
       userMessage = 'Cannot connect to backend server. Make sure it\'s running on port 8080.';
@@ -154,6 +166,57 @@ export const authAPI = {
       return { 
         success: false, 
         error: error.userMessage || 'Login failed. Please check your credentials.'
+      };
+    }
+  },
+
+  googleLogin: async (token) => {
+    try {
+      const response = await api.post('/auth/google', { token });
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.userMessage || 'Google Login failed. Please try again.'
+      };
+    }
+  }
+};
+
+// Bookings API
+export const bookingsAPI = {
+  createBooking: async (bookingData) => {
+    try {
+      const response = await api.post('/bookings', bookingData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.userMessage || 'Booking failed. Please try again.'
+      };
+    }
+  },
+
+  getUserBookings: async () => {
+    try {
+      const response = await api.get('/bookings/user');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.userMessage || 'Error fetching bookings.'
+      };
+    }
+  },
+
+  cancelBooking: async (id) => {
+    try {
+      const response = await api.delete(`/bookings/${id}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.userMessage || 'Cancellation failed.'
       };
     }
   }

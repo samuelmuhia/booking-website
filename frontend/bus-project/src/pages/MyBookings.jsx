@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
+import { bookingsAPI } from '../services/api';
 import './MyBookings.css';
 
 const MyBookings = () => {
@@ -8,31 +9,23 @@ const MyBookings = () => {
   const location = useLocation();
   const [bookings, setBookings] = useState([]);
 
-  // Load bookings from localStorage on component mount
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   useEffect(() => {
-    const loadBookings = () => {
-      try {
-        const savedBookings = JSON.parse(localStorage.getItem('userBookings') || '[]');
-        console.log('Loaded bookings from storage:', savedBookings);
-        
-        // If there's a new booking from navigation, add it
-        if (location.state?.newBooking) {
-          const updatedBookings = [...savedBookings, location.state.newBooking];
-          setBookings(updatedBookings);
-          localStorage.setItem('userBookings', JSON.stringify(updatedBookings));
-          // Clear the navigation state
-          window.history.replaceState({}, document.title);
-        } else {
-          setBookings(savedBookings);
-        }
-      } catch (error) {
-        console.error('Error loading bookings:', error);
-        setBookings([]);
+    const fetchBookings = async () => {
+      setLoading(true);
+      const result = await bookingsAPI.getUserBookings();
+      if (result.success) {
+        setBookings(result.data);
+      } else {
+        setError(result.error);
       }
+      setLoading(false);
     };
 
-    loadBookings();
-  }, [location.state]);
+    fetchBookings();
+  }, []);
 
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showTicketModal, setShowTicketModal] = useState(false);
@@ -71,7 +64,7 @@ const MyBookings = () => {
     setShowTicketModal(true);
   };
 
-  const handleCancelBooking = (booking) => {
+  const handleCancelBooking = async (booking) => {
     console.log('Cancel booking:', booking);
     
     if (booking.status === 'cancelled') {
@@ -79,35 +72,24 @@ const MyBookings = () => {
       return;
     }
 
-    if (booking.status === 'pending') {
-      if (window.confirm('Are you sure you want to cancel this pending booking?')) {
-        // Update booking status to cancelled
-        const updatedBookings = bookings.map(b => 
-          b.id === booking.id ? { ...b, status: 'cancelled' } : b
-        );
-        setBookings(updatedBookings);
-        localStorage.setItem('userBookings', JSON.stringify(updatedBookings));
-        alert('Booking cancelled successfully.');
-      }
-      return;
-    }
+    const confirmMessage = booking.status === 'confirmed' 
+      ? `Cancelling this confirmed booking will incur a 20% cancellation fee. Do you want to proceed?`
+      : `Are you sure you want to cancel this booking?`;
 
-    if (booking.status === 'confirmed') {
-      const cancellationFee = booking.totalPrice * 0.2; // 20% cancellation fee
-      if (window.confirm(
-        `Cancelling this confirmed booking will incur a 20% cancellation fee.\n\n` +
-        `Total refund: KSh ${booking.totalPrice - cancellationFee}\n` +
-        `Cancellation fee: KSh ${cancellationFee}\n\n` +
-        `Do you want to proceed?`
-      )) {
-        // Update booking status to cancelled
-        const updatedBookings = bookings.map(b => 
-          b.id === booking.id ? { ...b, status: 'cancelled' } : b
-        );
-        setBookings(updatedBookings);
-        localStorage.setItem('userBookings', JSON.stringify(updatedBookings));
-        alert(`Booking cancelled successfully.\nRefund amount: KSh ${booking.totalPrice - cancellationFee}`);
+    if (window.confirm(confirmMessage)) {
+      setLoading(true);
+      const result = await bookingsAPI.cancelBooking(booking.id);
+      if (result.success) {
+        alert('Booking cancelled successfully.');
+        // Refresh bookings
+        const refreshResult = await bookingsAPI.getUserBookings();
+        if (refreshResult.success) {
+          setBookings(refreshResult.data);
+        }
+      } else {
+        alert(result.error || 'Failed to cancel booking.');
       }
+      setLoading(false);
     }
   };
 
@@ -537,7 +519,16 @@ Generated on ${new Date().toLocaleDateString()}
         )}
       </div>
 
-      {bookings.length === 0 ? (
+      {loading && !bookings.length ? (
+        <div className="loading-state">
+          <p>Loading your bookings...</p>
+        </div>
+      ) : error ? (
+        <div className="error-state">
+          <p style={{ color: 'red' }}>{error}</p>
+          <button onClick={() => window.location.reload()} className="retry-btn">Retry</button>
+        </div>
+      ) : bookings.length === 0 ? (
         <div className="no-bookings">
           <h2>No bookings found</h2>
           <p>You haven't made any bookings yet.</p>
@@ -588,7 +579,7 @@ Generated on ${new Date().toLocaleDateString()}
                 <button 
                   className="action-btn cancel" 
                   onClick={() => handleCancelBooking(booking)}
-                  disabled={booking.status === 'cancelled'}
+                  disabled={booking.status === 'cancelled' || loading}
                 >
                   {booking.status === 'cancelled' ? 'Cancelled' : 'Cancel Booking'}
                 </button>

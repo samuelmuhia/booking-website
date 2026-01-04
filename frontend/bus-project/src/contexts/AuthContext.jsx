@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { authAPI, setAuthData, clearAuthData, getCurrentUser } from '../services/api';
 
 const AuthContext = createContext();
 
@@ -16,91 +17,56 @@ export const AuthProvider = ({ children }) => {
 
   // Check if user is logged in on component mount
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
+    const userData = getCurrentUser();
     
-    console.log('AuthProvider mounting - token:', token, 'userData:', userData); // Debug log
+    console.log('AuthProvider mounting - user:', userData); // Debug log
     
-    if (token && userData) {
-      try {
-        setUser(JSON.parse(userData));
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      }
+    if (userData) {
+      setUser(userData);
     }
     setLoading(false);
   }, []);
 
-  // Login function - FIXED
+  // Login function
   const login = async (email, password) => {
     console.log('AuthContext login called with:', { email, password }); // Debug log
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const result = await authAPI.login({ email, password });
     
-    try {
-      // Demo authentication - accept any non-empty credentials
-      if (email && password) {
-        const userData = {
-          id: 1,
-          name: email.split('@')[0] || 'User',
-          email: email
-        };
-        const token = "demo-token-" + Date.now();
-        
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(userData));
-        setUser(userData);
-        
-        console.log('Login successful, user set:', userData); // Debug log
-        return { success: true, user: userData };
-      } else {
-        return { success: false, error: 'Please enter both email and password' };
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      return { success: false, error: 'Login failed' };
+    if (result.success) {
+      const { user, token } = result.data;
+      setAuthData(token, user);
+      setUser(user);
+      console.log('Login successful, user set:', user);
+      return { success: true, user };
+    } else {
+      console.error('Login error:', result.error);
+      return { success: false, error: result.error };
     }
   };
 
-  // Register function - FIXED
+  // Register function
   const register = async (userData) => {
     console.log('AuthContext register called with:', userData); // Debug log
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const result = await authAPI.register(userData);
     
-    try {
-      if (userData.email && userData.password && userData.name) {
-        const newUser = {
-          id: Date.now(),
-          name: userData.name,
-          email: userData.email
-        };
-        const token = "demo-token-" + Date.now();
-        
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(newUser));
-        setUser(newUser);
-        
-        console.log('Registration successful, user set:', newUser); // Debug log
-        return { success: true, user: newUser };
-      } else {
-        return { success: false, error: 'Please fill all fields' };
-      }
-    } catch (error) {
-      console.error('Registration error:', error);
-      return { success: false, error: 'Registration failed' };
+    if (result.success) {
+      const { user, token } = result.data;
+      setAuthData(token, user);
+      setUser(user);
+      console.log('Registration successful, user set:', user);
+      return { success: true, user };
+    } else {
+      console.error('Registration error:', result.error);
+      return { success: false, error: result.error };
     }
   };
 
-  // Logout function - FIXED
+  // Logout function
   const logout = () => {
     console.log('AuthContext logout called'); // Debug log
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearAuthData();
     setUser(null);
     // Use window.location for reliable redirect
     window.location.href = '/login';

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { bookingsAPI } from '../services/api';
 import './Booking.css';
 
 const Booking = () => {
@@ -59,11 +60,30 @@ const Booking = () => {
     setLoading(true);
 
     try {
-      // Simulate booking process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Create individual bookings for each selected seat
+      const bookingPromises = selectedSeats.map((seatNumber, index) => {
+        const passenger = passengerDetails[index];
+        return bookingsAPI.createBooking({
+          bus_id: bus.id,
+          seat_number: seatNumber.toString(),
+          travel_date: bus.date,
+          passenger: {
+            name: passenger.name,
+            age: passenger.age.toString(),
+            gender: passenger.gender
+          }
+        });
+      });
+
+      const results = await Promise.all(bookingPromises);
+      const failed = results.filter(r => !r.success);
+
+      if (failed.length > 0) {
+        throw new Error(failed[0].error || 'Some bookings failed');
+      }
       
-      // Create booking object with all details
-      const bookingData = {
+      // Create a local record for display (optional, but keep it for UI consistency)
+      const bookingRecord = {
         id: Date.now(),
         busName: bus.name,
         from: bus.from,
@@ -80,20 +100,15 @@ const Booking = () => {
         busType: bus.type
       };
 
-      // Save booking to localStorage (in real app, this would be an API call)
-      const existingBookings = JSON.parse(localStorage.getItem('userBookings') || '[]');
-      const updatedBookings = [...existingBookings, bookingData];
-      localStorage.setItem('userBookings', JSON.stringify(updatedBookings));
-
-      console.log('Booking saved:', bookingData);
+      console.log('Bookings created in DB and local record:', bookingRecord);
       
       // Show success message
       alert(`Booking confirmed! 🎉\n\nYour booking for ${selectedSeats.length} seat(s) on ${bus.name} has been confirmed.\nTotal: KSh ${totalPrice}\n\nYou will be redirected to your bookings.`);
       
-      // Navigate to my bookings page with the new booking data
-      navigate('/my-bookings', { state: { newBooking: bookingData } });
+      // Navigate to my bookings page
+      navigate('/my-bookings', { state: { newBooking: bookingRecord } });
     } catch (error) {
-      alert('Booking failed. Please try again.');
+      alert(error.message || 'Booking failed. Please try again.');
       console.error('Booking error:', error);
     } finally {
       setLoading(false);

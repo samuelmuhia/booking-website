@@ -44,16 +44,9 @@ const Login = () => {
     setError('');
     setLoading(true);
     try {
-      const result = await authAPI.googleLogin(credentialResponse.credential);
+      const result = await loginWithGoogle(credentialResponse.credential);
       if (result.success) {
-        const { user, token } = result.data;
-        setAuthData(token, user);
-        // We need to also update the state in AuthContext, but AuthContext doesn't expose a 'setUser' directly
-        // However, the dashboard will see the token in localStorage.
-        // For a smoother experience, we should probably add googleLogin to AuthContext too.
-        // For now, let's just navigate which will cause a reload/mount check.
         navigate('/dashboard');
-        window.location.reload(); // Force reload to ensure AuthContext picks up new user
       } else {
         setError(result.error || 'Google Login failed');
       }

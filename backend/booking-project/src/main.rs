@@ -7,7 +7,8 @@ use actix_cors::Cors;
 use actix_web::{http, web, App, HttpServer, Responder, HttpResponse};
 use actix_web::middleware::Logger;
 use db::mongodb::MongoDB;
-use handlers::{auth, buses};
+use handlers::{auth, buses, bookings};
+use middleware::auth::Auth;
 
 // Simple health check endpoint
 async fn health_check() -> impl Responder {
@@ -34,7 +35,12 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to connect to MongoDB");
     
-    let db_data = web::Data::new(db);
+    let db_data = web::Data::new(db.clone());
+    
+    // Seed data on startup
+    if let Err(e) = db.seed_data().await {
+        eprintln!("⚠️ Failed to seed data: {}", e);
+    }
     
     println!("🚀 Starting server on http://0.0.0.0:8080");
     println!("📡 Frontend should connect to: http://localhost:8080");
@@ -65,12 +71,19 @@ async fn main() -> std::io::Result<()> {
                         web::scope("/auth")
                             .route("/register", web::post().to(auth::register))
                             .route("/login", web::post().to(auth::login))
+                            .route("/google", web::post().to(auth::google_login))
                     )
                     .service(
                         web::scope("/buses")
                             .route("", web::get().to(buses::get_buses))
                             .route("/{id}", web::get().to(buses::get_bus))
                             .route("/{id}/seats", web::get().to(buses::get_bus_seats))
+                    )
+                    .service(
+                        web::scope("/bookings")
+                            .route("", web::post().to(bookings::create_booking))
+                            .route("/user", web::get().to(bookings::get_user_bookings))
+                            .route("/{id}", web::delete().to(bookings::cancel_booking))
                     )
             )
     })

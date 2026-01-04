@@ -63,6 +63,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Google Login function
+  const loginWithGoogle = async (token) => {
+    console.log('AuthContext loginWithGoogle called');
+    const result = await authAPI.googleLogin(token);
+    
+    if (result.success) {
+      const { user, token: authToken } = result.data;
+      setAuthData(authToken, user);
+      setUser(user);
+      console.log('Google login successful, user set:', user);
+      return { success: true, user };
+    } else {
+      console.error('Google login error:', result.error);
+      return { success: false, error: result.error };
+    }
+  };
+
   // Logout function
   const logout = () => {
     console.log('AuthContext logout called'); // Debug log
@@ -76,6 +93,7 @@ export const AuthProvider = ({ children }) => {
     user,
     login,
     register,
+    loginWithGoogle,
     logout,
     loading
   };

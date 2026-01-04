@@ -8,7 +8,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000,
+  timeout: 30000, // Increased to 30s
 });
 
 // Request interceptor
@@ -35,9 +35,12 @@ api.interceptors.response.use(
   (error) => {
     console.error(`❌ API Error: ${error.response?.status} ${error.config?.url}`);
     
+    
     let userMessage = 'An unexpected error occurred';
     
-    if (error.response?.status === 401) {
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      userMessage = 'Request timed out. The server is taking too long to respond.';
+    } else if (error.response?.status === 401) {
       // If it's a login attempt, use the server's error message if available
       if (error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register')) {
         userMessage = error.response.data?.error || 'Invalid credentials. Please try again.';
@@ -51,10 +54,8 @@ api.interceptors.response.use(
       }
     } else if (error.response?.status === 404) {
       userMessage = 'API endpoint not found. Check if backend is running.';
-    } else if (error.code === 'ECONNREFUSED') {
-      userMessage = 'Cannot connect to backend server. Make sure it\'s running on port 8080.';
-    } else if (error.message.includes('Network Error')) {
-      userMessage = 'Network error. Check if backend server is running.';
+    } else if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
+      userMessage = 'Cannot connect to backend server. Make sure it\'s running on port 8080 and MongoDB is active.';
     } else if (error.response?.data?.error) {
       userMessage = error.response.data.error;
     }

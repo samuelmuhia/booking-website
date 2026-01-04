@@ -10,7 +10,10 @@ pub async fn get_buses(db: web::Data<MongoDB>) -> Result<HttpResponse, Error> {
     let mut buses = Vec::new();
     while let Some(result) = cursor.next().await {
         match result {
-            Ok(bus) => buses.push(bus),
+            Ok(bus) => {
+                let resp: crate::models::bus::BusResponse = bus.into();
+                buses.push(resp);
+            },
             Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
         }
     }
@@ -24,7 +27,10 @@ pub async fn get_bus(db: web::Data<MongoDB>, path: web::Path<String>) -> Result<
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
     
     match bus {
-        Some(bus) => Ok(HttpResponse::Ok().json(bus)),
+        Some(bus) => {
+            let resp: crate::models::bus::BusResponse = bus.into();
+            Ok(HttpResponse::Ok().json(resp))
+        },
         None => Ok(HttpResponse::NotFound().body("Bus not found")),
     }
 }

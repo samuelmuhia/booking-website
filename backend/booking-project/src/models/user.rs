@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct User {
+    #[serde(rename = "_id")]
     pub id: Option<bson::oid::ObjectId>,
     pub username: String,
     pub email: String,
